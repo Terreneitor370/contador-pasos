@@ -1,6 +1,6 @@
 # Contador de Pasos
 
-Aplicación móvil hecha con Expo/React Native que cuenta pasos en tiempo real usando el acelerómetro del dispositivo, y estima distancia recorrida, ritmo (pasos/min) y si el usuario está caminando o corriendo.
+Aplicación móvil hecha con Expo/React Native, con un diseño inspirado en Google Fit, que cuenta pasos en tiempo real usando el acelerómetro del dispositivo y estima distancia recorrida, ritmo (pasos/min) y si el usuario está caminando o corriendo. Cada sesión guardada (botón "Reiniciar") se conserva en un historial local persistente.
 
 ## Requisitos previos
 
@@ -48,10 +48,23 @@ Esto abre Expo CLI con un código QR:
 ## Estructura del proyecto
 
 ```
-App.tsx                      # Punto de entrada de la UI
+App.tsx                        # Punto de entrada: pestañas Inicio/Historial
 src/
   screens/
-    HomeScreen.tsx           # Pantalla principal (UI del contador)
+    HomeScreen.tsx            # Pantalla principal (anillo de progreso estilo Google Fit)
+    HistoryScreen.tsx         # Lista de sesiones guardadas
+  components/
+    StepRing.tsx              # Anillo de progreso animado (react-native-svg)
+    BottomTabBar.tsx          # Barra de navegación inferior
   hooks/
-    useFitnessSensor.ts      # Lógica de detección de pasos con el acelerómetro
+    useFitnessSensor.ts       # Lógica de detección de pasos con el acelerómetro
+    useSessionHistory.ts      # Estado del historial (carga/guarda)
+  storage/
+    history.ts                # Persistencia con AsyncStorage
+  theme.ts                    # Paleta de colores compartida
+  types.ts                    # Tipos compartidos (StepSession, SessionSummary)
+  utils/
+    format.ts                 # Formato de fechas/distancia/duración
 ```
+
+El historial se guarda en el almacenamiento local del dispositivo (`AsyncStorage`); no se sincroniza entre dispositivos ni se sube a ningún servidor.

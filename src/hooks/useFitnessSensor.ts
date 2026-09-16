@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { Accelerometer } from 'expo-sensors';
+import type { SessionSummary } from '../types';
 
 export type MovementState = 'walking' | 'running' | 'idle';
 
-export interface FitnessSensorConfig {
+export interface SensorTuning {
   updateIntervalMs?: number;
   peakThreshold?: number;
   peakDropThreshold?: number;
@@ -11,6 +12,10 @@ export interface FitnessSensorConfig {
   runningIntervalMs?: number;
   walkingStrideM?: number;
   runningStrideM?: number;
+}
+
+export interface FitnessSensorConfig extends SensorTuning {
+  onSessionSaved?: (summary: SessionSummary) => void;
 }
 
 export interface FitnessSensorState {
@@ -25,7 +30,7 @@ export interface FitnessSensorState {
   reset: () => void;
 }
 
-const DEFAULT_CONFIG: Required<FitnessSensorConfig> = {
+const DEFAULT_CONFIG: Required<SensorTuning> = {
   updateIntervalMs: 60,
   peakThreshold: 0.4,
   peakDropThreshold: 0.15,
@@ -39,7 +44,7 @@ const BASELINE_BLEED = 0.08;
 const CADENCE_WINDOW = 8;
 
 export function useFitnessSensor(config: FitnessSensorConfig = {}): FitnessSensorState {
-  const settings: Required<FitnessSensorConfig> = { ...DEFAULT_CONFIG, ...config };
+  const settings: Required<SensorTuning> = { ...DEFAULT_CONFIG, ...config };
 
   const [steps, setSteps] = useState(0);
   const [distanceMeters, setDistanceMeters] = useState(0);
@@ -55,6 +60,9 @@ export function useFitnessSensor(config: FitnessSensorConfig = {}): FitnessSenso
   const stepCountRef = useRef(0);
   const distanceRef = useRef(0);
   const initializedRef = useRef(false);
+  const sessionStartedAtRef = useRef(0);
+  const onSessionSavedRef = useRef(config.onSessionSaved);
+  onSessionSavedRef.current = config.onSessionSaved;
 
   useEffect(() => {
     let mounted = true;
@@ -144,13 +152,23 @@ export function useFitnessSensor(config: FitnessSensorConfig = {}): FitnessSenso
     isActive,
     isAvailable,
     cadenceSpm,
-    start: () => setIsActive(true),
+    start: () => {
+      if (stepCountRef.current === 0) sessionStartedAtRef.current = Date.now();
+      setIsActive(true);
+    },
     stop: () => {
       setIsActive(false);
       setActivity('idle');
       setCadenceSpm(0);
     },
     reset: () => {
+      if (stepCountRef.current > 0) {
+        onSessionSavedRef.current?.({
+          steps: stepCountRef.current,
+          distanceMeters: distanceRef.current,
+          durationMs: sessionStartedAtRef.current > 0 ? Date.now() - sessionStartedAtRef.current : 0,
+        });
+      }
       stepCountRef.current = 0;
       distanceRef.current = 0;
       intervalsRef.current = [];
@@ -158,6 +176,7 @@ export function useFitnessSensor(config: FitnessSensorConfig = {}): FitnessSenso
       isPeakRef.current = false;
       initializedRef.current = false;
       baselineRef.current = 0;
+      sessionStartedAtRef.current = 0;
       setSteps(0);
       setDistanceMeters(0);
       setActivity('idle');

@@ -1,74 +1,78 @@
 import React from 'react';
-import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+import StepRing from '../components/StepRing';
+import { COLORS } from '../theme';
+import { formatDistance } from '../utils/format';
 import type { MovementState } from '../hooks/useFitnessSensor';
 import { useFitnessSensor } from '../hooks/useFitnessSensor';
+import type { SessionSummary } from '../types';
 
-const COLORS = {
-  paper: '#F6F3EC',
-  ink: '#211F1D',
-  subink: '#655E55',
-  hairline: '#E3DDCF',
-  card: '#FFFFFF',
-  forest: '#2C6B4A',
-  ember: '#B85C1B',
-  stone: '#8C867E',
-  rust: '#9E3B24',
-};
+const DAILY_GOAL_STEPS = 10000;
 
-const FONTS = {
-  display: Platform.select({ ios: 'Georgia', android: 'serif', default: 'serif' }),
-  mono: Platform.select({ ios: 'Menlo', android: 'monospace', default: 'monospace' }),
-};
+interface HomeScreenProps {
+  onSessionSaved: (summary: SessionSummary) => void;
+}
 
 function statusStyle(activity: MovementState, isActive: boolean) {
   if (!isActive) return { label: 'Detenido', color: COLORS.stone };
-  if (activity === 'running') return { label: 'Corriendo', color: COLORS.ember };
-  return { label: 'Caminando', color: COLORS.forest };
+  if (activity === 'running') return { label: 'Corriendo', color: COLORS.red };
+  return { label: 'Caminando', color: COLORS.green };
 }
 
-export default function HomeScreen() {
+const todayLabel = new Date().toLocaleDateString('es-MX', {
+  weekday: 'long',
+  day: 'numeric',
+  month: 'long',
+});
+
+export default function HomeScreen({ onSessionSaved }: HomeScreenProps) {
   const { steps, distanceMeters, activity, isActive, isAvailable, cadenceSpm, start, stop, reset } =
-    useFitnessSensor();
+    useFitnessSensor({ onSessionSaved });
 
   const status = statusStyle(activity, isActive);
-  const distanceText =
-    distanceMeters >= 1000
-      ? `${(distanceMeters / 1000).toFixed(2)} km`
-      : `${Math.round(distanceMeters)} m`;
+  const progress = steps / DAILY_GOAL_STEPS;
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={styles.safeArea} edges={['top']}>
       <View style={styles.container}>
         <View style={styles.headerBlock}>
-          <Text style={styles.eyebrow}>Sesión actual</Text>
+          <Text style={styles.date}>{todayLabel}</Text>
           <Text style={styles.header}>Contador de Pasos</Text>
         </View>
 
-        <View style={[styles.ring, { borderColor: status.color }]}>
+        <StepRing
+          size={224}
+          strokeWidth={16}
+          progress={progress}
+          color={status.color}
+          trackColor={COLORS.hairline}
+        >
+          <MaterialCommunityIcons name="shoe-print" size={22} color={status.color} />
           <Text style={styles.stepsValue}>{steps}</Text>
-          <Text style={styles.stepsLabel}>pasos</Text>
-        </View>
+          <Text style={styles.stepsLabel}>de {DAILY_GOAL_STEPS.toLocaleString('es-MX')} pasos</Text>
+        </StepRing>
 
-        <View style={[styles.statusCard, { borderColor: status.color }]}>
+        <View style={[styles.statusPill, { backgroundColor: `${status.color}1A` }]}>
           <View style={[styles.statusDot, { backgroundColor: status.color }]} />
           <Text style={[styles.statusLabel, { color: status.color }]}>{status.label}</Text>
         </View>
 
         <View style={styles.cardsRow}>
           <View style={styles.card}>
-            <Text style={styles.cardLabel}>Distancia</Text>
+            <MaterialCommunityIcons name="map-marker-distance" size={20} color={COLORS.green} />
             <Text numberOfLines={1} adjustsFontSizeToFit style={styles.cardValue}>
-              {distanceText}
+              {formatDistance(distanceMeters)}
             </Text>
-            <Text style={styles.cardSub}>recorrida</Text>
+            <Text style={styles.cardLabel}>Distancia</Text>
           </View>
           <View style={styles.card}>
-            <Text style={styles.cardLabel}>Ritmo</Text>
+            <MaterialCommunityIcons name="speedometer" size={20} color={COLORS.red} />
             <Text numberOfLines={1} adjustsFontSizeToFit style={styles.cardValue}>
               {cadenceSpm > 0 ? cadenceSpm : '—'}
             </Text>
-            <Text style={styles.cardSub}>pasos / min</Text>
+            <Text style={styles.cardLabel}>Pasos / min</Text>
           </View>
         </View>
 
@@ -76,38 +80,39 @@ export default function HomeScreen() {
           <Text style={styles.warning}>El acelerómetro no está disponible en este dispositivo.</Text>
         )}
 
-        <View style={styles.buttonsRow}>
-          {isActive ? (
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Detener conteo de pasos"
-              style={({ pressed }) => [styles.button, styles.stopButton, pressed && styles.pressed]}
-              onPress={stop}
-            >
-              <Text style={styles.stopButtonText}>Detener</Text>
-            </Pressable>
-          ) : (
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Iniciar conteo de pasos"
-              style={({ pressed }) => [
-                styles.button,
-                styles.startButton,
-                pressed && styles.pressed,
-              ]}
-              onPress={start}
-            >
-              <Text style={styles.startButtonText}>Iniciar</Text>
-            </Pressable>
+        <View style={styles.bottomGroup}>
+          {steps > 0 && (
+            <Text style={styles.hint}>Reiniciar guarda esta sesión en tu historial.</Text>
           )}
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Reiniciar contador"
-            style={({ pressed }) => [styles.button, styles.resetButton, pressed && styles.pressed]}
-            onPress={reset}
-          >
-            <Text style={styles.resetButtonText}>Reiniciar</Text>
-          </Pressable>
+          <View style={styles.buttonsRow}>
+            {isActive ? (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Detener conteo de pasos"
+                style={({ pressed }) => [styles.button, styles.stopButton, pressed && styles.pressed]}
+                onPress={stop}
+              >
+                <Text style={styles.stopButtonText}>Detener</Text>
+              </Pressable>
+            ) : (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Iniciar conteo de pasos"
+                style={({ pressed }) => [styles.button, styles.startButton, pressed && styles.pressed]}
+                onPress={start}
+              >
+                <Text style={styles.startButtonText}>Iniciar</Text>
+              </Pressable>
+            )}
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Guardar y reiniciar contador"
+              style={({ pressed }) => [styles.button, styles.resetButton, pressed && styles.pressed]}
+              onPress={reset}
+            >
+              <Text style={styles.resetButtonText}>Reiniciar</Text>
+            </Pressable>
+          </View>
         </View>
       </View>
     </SafeAreaView>
@@ -117,86 +122,60 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: COLORS.paper,
+    backgroundColor: COLORS.background,
   },
   container: {
     flex: 1,
-    backgroundColor: COLORS.paper,
+    backgroundColor: COLORS.background,
     alignItems: 'center',
     paddingHorizontal: 20,
     paddingTop: 12,
   },
   headerBlock: {
     alignItems: 'center',
-    marginBottom: 24,
+    marginBottom: 20,
   },
-  eyebrow: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: COLORS.subink,
-    letterSpacing: 2,
-    textTransform: 'uppercase',
-    marginBottom: 6,
+  date: {
+    fontSize: 14,
+    color: COLORS.subtext,
+    marginBottom: 2,
+    textTransform: 'capitalize',
   },
   header: {
-    fontFamily: FONTS.display,
-    fontSize: 30,
+    fontSize: 24,
     fontWeight: '700',
     color: COLORS.ink,
-  },
-  ring: {
-    width: 208,
-    height: 208,
-    borderRadius: 104,
-    borderWidth: 14,
-    backgroundColor: COLORS.card,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000000',
-    shadowOpacity: 0.08,
-    shadowRadius: 16,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 6,
   },
   stepsValue: {
-    fontFamily: FONTS.mono,
-    fontSize: 66,
-    fontWeight: '700',
+    fontSize: 52,
+    fontWeight: '800',
     color: COLORS.ink,
+    marginTop: 6,
     fontVariant: ['tabular-nums'],
   },
   stepsLabel: {
     fontSize: 13,
-    fontWeight: '700',
-    color: COLORS.subink,
-    letterSpacing: 1.5,
-    textTransform: 'uppercase',
+    fontWeight: '600',
+    color: COLORS.subtext,
     marginTop: 2,
   },
-  statusCard: {
+  statusPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: COLORS.card,
-    borderWidth: 1,
     borderRadius: 999,
-    paddingHorizontal: 22,
-    paddingVertical: 10,
-    marginTop: 28,
-    marginBottom: 20,
-    shadowColor: '#000000',
-    shadowOpacity: 0.05,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 3,
+    paddingHorizontal: 18,
+    paddingVertical: 8,
+    marginTop: 20,
+    marginBottom: 18,
   },
   statusDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    marginRight: 10,
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    marginRight: 8,
   },
   statusLabel: {
-    fontSize: 18,
+    fontSize: 15,
     fontWeight: '700',
   },
   cardsRow: {
@@ -208,45 +187,47 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: COLORS.card,
     borderRadius: 20,
-    padding: 20,
+    paddingVertical: 18,
     marginHorizontal: 6,
     alignItems: 'center',
     shadowColor: '#000000',
-    shadowOpacity: 0.05,
-    shadowRadius: 12,
+    shadowOpacity: 0.06,
+    shadowRadius: 10,
     shadowOffset: { width: 0, height: 2 },
-    elevation: 3,
+    elevation: 2,
+  },
+  cardValue: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: COLORS.ink,
+    marginTop: 8,
+    fontVariant: ['tabular-nums'],
   },
   cardLabel: {
     fontSize: 12,
-    fontWeight: '700',
-    color: COLORS.subink,
-    letterSpacing: 1,
-    textTransform: 'uppercase',
-    marginBottom: 10,
-  },
-  cardValue: {
-    fontFamily: FONTS.mono,
-    fontSize: 30,
-    fontWeight: '700',
-    color: COLORS.ink,
-    fontVariant: ['tabular-nums'],
-  },
-  cardSub: {
-    fontSize: 13,
-    color: COLORS.subink,
-    marginTop: 4,
+    fontWeight: '600',
+    color: COLORS.subtext,
+    marginTop: 2,
   },
   warning: {
     marginTop: 16,
-    color: COLORS.rust,
+    color: COLORS.stop,
     fontSize: 14,
     textAlign: 'center',
+  },
+  bottomGroup: {
+    width: '100%',
+    marginTop: 'auto',
+  },
+  hint: {
+    fontSize: 12,
+    color: COLORS.subtext,
+    textAlign: 'center',
+    marginBottom: 10,
   },
   buttonsRow: {
     flexDirection: 'row',
     width: '100%',
-    marginTop: 'auto',
     marginBottom: 12,
     gap: 12,
   },
@@ -258,24 +239,20 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   startButton: {
-    backgroundColor: COLORS.forest,
+    backgroundColor: COLORS.green,
   },
   startButtonText: {
     color: COLORS.card,
     fontSize: 16,
     fontWeight: '700',
-    letterSpacing: 1,
-    textTransform: 'uppercase',
   },
   stopButton: {
-    backgroundColor: COLORS.rust,
+    backgroundColor: COLORS.stop,
   },
   stopButtonText: {
     color: COLORS.card,
     fontSize: 16,
     fontWeight: '700',
-    letterSpacing: 1,
-    textTransform: 'uppercase',
   },
   resetButton: {
     backgroundColor: COLORS.card,
@@ -286,8 +263,6 @@ const styles = StyleSheet.create({
     color: COLORS.ink,
     fontSize: 16,
     fontWeight: '700',
-    letterSpacing: 1,
-    textTransform: 'uppercase',
   },
   pressed: {
     opacity: 0.75,
